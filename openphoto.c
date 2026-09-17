@@ -7,9 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
-/* #include <png.h> */
-#include </usr/local/include/png.h>
-/* #include </usr/local/include/spng.h> */
+#include <png.h>
 
 #include "openphoto.h"
 
@@ -19,7 +17,7 @@ XWindow openphoto_create_window(int width, int height) {
   /* Make window */
   Display *dpy = XOpenDisplay(NULL);
   if (!dpy) {
-    fprintf(stderr,"X failed to open display.\n");
+    fprintf(stderr, "X failed to open display.\n");
   }
   int screen = XDefaultScreen(dpy);
   Visual *visual = DefaultVisual(dpy, screen);
@@ -92,9 +90,9 @@ int main(int argc, char *argv[]) {
   if (is_png) {
     file_opts.extension = "png";
   } else {
-    fprintf(stderr,"Only png supported yet\n");
+    fprintf(stderr, "Only png supported yet\n");
   }
-  
+
   free(buffer);
   fclose(header);
 
@@ -153,10 +151,8 @@ int main(int argc, char *argv[]) {
   /* Open window */
   XWindow xwindow =
       openphoto_create_window(image_opts.width, image_opts.height);
-  /*
-   * Convert all supported PNG types to 8-bit RGBA.
-   */
 
+  /* Convert all supported PNG types to 8-bit RGBA. */
   if (bit_depth == 16)
     png_set_strip_16(png_ptr);
 
@@ -178,7 +174,7 @@ int main(int argc, char *argv[]) {
   png_size_t rowbytes = png_get_rowbytes(png_ptr, info_ptr);
 
   int height = image_opts.height;
-  
+
   png_bytep pixels = malloc(rowbytes * (size_t)height);
 
   if (!pixels) {
@@ -208,7 +204,7 @@ int main(int argc, char *argv[]) {
 
   char *image_data =
       malloc((size_t)image_opts.height * (size_t)image_opts.width * 4);
-  
+
   if (!image_data) {
     fprintf(stderr, "Couldn't allocate XImage data\n");
 
@@ -217,7 +213,7 @@ int main(int argc, char *argv[]) {
     XFreeGC(xwindow.dpy, xwindow.gc);
     XCloseDisplay(xwindow.dpy);
     return 1;
-}
+  }
 
   XImage *image =
       XCreateImage(xwindow.dpy, xwindow.visual, xwindow.depth, ZPixmap, 0,
@@ -285,7 +281,7 @@ int main(int argc, char *argv[]) {
     case KeyPress: {
       KeySym keysym = XLookupKeysym(&event.xkey, 0);
       if (keysym == XK_q) {
-	running = 0;
+        running = 0;
       }
 
       else if (keysym == XK_minus) {
