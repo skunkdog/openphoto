@@ -1,4 +1,3 @@
-#include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -68,7 +67,7 @@ int main(int argc, char *argv[]) {
   } else {
     file_opts.name = argv[1];
   }
-  
+
   /* Parce options */
   for (int i = 2; i < argc; i++) {
     if (!strcmp("-g", argv[i])) {
@@ -125,7 +124,7 @@ int main(int argc, char *argv[]) {
   png_init_io(png_ptr, file);
 
   png_read_info(png_ptr, info_ptr);
- 
+
   png_uint_32 png_width;
   png_uint_32 png_height;
   int bit_depth;
@@ -165,8 +164,9 @@ int main(int argc, char *argv[]) {
   image_opts.width = (int)png_width;
   image_opts.height = (int)png_height;
   image_opts.zoom = 1.0;
-    
-  png_bytep *row_pointers = malloc((size_t)image_opts.height * sizeof(*row_pointers));
+
+  png_bytep *row_pointers =
+      malloc((size_t)image_opts.height * sizeof(*row_pointers));
 
   if (!row_pointers) {
     fprintf(stderr, "Couldn't allocate memory\n");
@@ -190,13 +190,14 @@ int main(int argc, char *argv[]) {
       return 1;
     }
   }
-  
+
   png_read_image(png_ptr, row_pointers);
   fclose(file);
   png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 
   /* Open window */
-  XWindow xwindow = openphoto_create_window(image_opts.width, image_opts.height);
+  XWindow xwindow =
+      openphoto_create_window(image_opts.width, image_opts.height);
 
   char *image_data = malloc((size_t)image_opts.height * image_opts.width * 4);
   if (!image_data) {
@@ -208,7 +209,7 @@ int main(int argc, char *argv[]) {
   XImage *image =
       XCreateImage(xwindow.dpy, xwindow.visual, xwindow.depth, ZPixmap, 0,
                    image_data, image_opts.width, image_opts.height, 32, 0);
-  
+
   if (!image) {
     fprintf(stderr, "X failed to create XImage\n");
     free(image_data);
@@ -217,10 +218,10 @@ int main(int argc, char *argv[]) {
     free(row_pointers);
     return 1;
   }
-  
+
   for (int y = 0; y < image_opts.height; y++) {
     for (int x = 0; x < image_opts.width; x++) {
-      
+
       png_bytep p = &row_pointers[y][x * 4];
       unsigned long red = p[0];
       unsigned long green = p[1];
@@ -228,14 +229,14 @@ int main(int argc, char *argv[]) {
       unsigned long pixel = 0;
 
       if (GREYSCALE) {
-	unsigned long gray = (299 * red + 587 * green + 114 * blue) / 1000;
-	pixel |= (gray * xwindow.visual->red_mask) / 255;
-	pixel |= (gray * xwindow.visual->green_mask) / 255;
-	pixel |= (gray * xwindow.visual->blue_mask) / 255;
+        unsigned long gray = (299 * red + 587 * green + 114 * blue) / 1000;
+        pixel |= (gray * xwindow.visual->red_mask) / 255;
+        pixel |= (gray * xwindow.visual->green_mask) / 255;
+        pixel |= (gray * xwindow.visual->blue_mask) / 255;
       }
 
       else {
-	pixel |= (red * xwindow.visual->red_mask) / 255;
+        pixel |= (red * xwindow.visual->red_mask) / 255;
         pixel |= (green * xwindow.visual->green_mask) / 255;
         pixel |= (blue * xwindow.visual->blue_mask) / 255;
       }
@@ -243,10 +244,11 @@ int main(int argc, char *argv[]) {
       XPutPixel(image, x, y, pixel);
     }
   }
-    
+
   Pixmap pixmap = XCreatePixmap(xwindow.dpy, xwindow.w, image_opts.width,
                                 image_opts.width, xwindow.depth);
-  XPutImage(xwindow.dpy, pixmap, xwindow.gc, image, 0, 0, 0, 0, image_opts.width,image_opts.height);
+  XPutImage(xwindow.dpy, pixmap, xwindow.gc, image, 0, 0, 0, 0,
+            image_opts.width, image_opts.height);
 
   for (int y = 0; y < (int)sizeof rowbytes; y++) {
     free(row_pointers[y]);
@@ -264,39 +266,37 @@ int main(int argc, char *argv[]) {
       XCopyArea(xwindow.dpy, pixmap, xwindow.w, xwindow.gc, 0, 0,
                 image_opts.width * image_opts.zoom,
                 image_opts.height * image_opts.zoom, 0, 0);
-      
+
       XFlush(xwindow.dpy);
       break;
     }
-      
+
     case KeyPress: {
       KeySym keysym = XLookupKeysym(&event.xkey, 0);
-      if (keysym == XK_q){
+      if (keysym == XK_q) {
         return 0;
       }
-      
+
       else if (keysym == XK_minus) {
         /* Zoom out */
         image_opts.zoom -= 0.1;
-	printf("%f\n", image_opts.zoom);
+        printf("%f\n", image_opts.zoom);
       }
-      
+
       else if (keysym == XK_equal) {
         /* Zoom in */
         image_opts.zoom += 0.1;
         printf("%f\n", image_opts.zoom);
       }
-      
     }
     }
   }
-  
+
   XDestroyImage(image);
   XDestroyWindow(xwindow.dpy, xwindow.w);
   XCloseDisplay(xwindow.dpy);
 
   return 0;
 }
-
 
 /* TODO: - Zoom */

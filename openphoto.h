@@ -13,12 +13,12 @@ typedef struct XWindow {
   GC gc;
   Visual *visual;
   int depth;
-} XWindow ;
+} XWindow;
 
 typedef struct image_opts {
-    int width;
-    int height;
-    float zoom;
-  } image_opts;
+  int width;
+  int height;
+  float zoom;
+} image_opts;
 
 #endif
