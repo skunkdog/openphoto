@@ -9,6 +9,7 @@
 
 /* #include <png.h> */
 #include </usr/local/include/png.h>
+/* #include </usr/local/include/spng.h> */
 
 #include "openphoto.h"
 
@@ -17,6 +18,9 @@
 XWindow openphoto_create_window(int width, int height) {
   /* Make window */
   Display *dpy = XOpenDisplay(NULL);
+  if (!dpy) {
+    fprintf(stderr,"X failed to open display.\n");
+  }
   int screen = XDefaultScreen(dpy);
   Visual *visual = DefaultVisual(dpy, screen);
   int depth = DefaultDepth(dpy, screen);
@@ -87,7 +91,11 @@ int main(int argc, char *argv[]) {
   int is_png = !png_sig_cmp(buffer, 0, buffer_size);
   if (is_png) {
     file_opts.extension = "png";
+  } else {
+    fprintf(stderr,"Only png supported yet\n");
   }
+  
+  free(buffer);
   fclose(header);
 
   /* Work with image */
@@ -108,7 +116,7 @@ int main(int argc, char *argv[]) {
 
   png_infop end_info = png_create_info_struct(png_ptr);
   if (!end_info) {
-    png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)NULL);
+    png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
     fprintf(stderr, "Failed to create info struct!\n");
     return 1;
   }
@@ -136,6 +144,15 @@ int main(int argc, char *argv[]) {
   png_get_IHDR(png_ptr, info_ptr, &png_width, &png_height, &bit_depth,
                &color_type, &interlace_type, &compression_type, &filter_method);
 
+  /* Image options */
+  image_opts image_opts;
+  image_opts.width = (int)png_width;
+  image_opts.height = (int)png_height;
+  image_opts.zoom = 1.0;
+
+  /* Open window */
+  XWindow xwindow =
+      openphoto_create_window(image_opts.width, image_opts.height);
   /*
    * Convert all supported PNG types to 8-bit RGBA.
    */
@@ -158,53 +175,49 @@ int main(int argc, char *argv[]) {
   }
 
   png_read_update_info(png_ptr, info_ptr);
+  png_size_t rowbytes = png_get_rowbytes(png_ptr, info_ptr);
 
-  /* Image options */
-  image_opts image_opts;
-  image_opts.width = (int)png_width;
-  image_opts.height = (int)png_height;
-  image_opts.zoom = 1.0;
+  int height = image_opts.height;
+  
+  png_bytep pixels = malloc(rowbytes * (size_t)height);
 
-  png_bytep *row_pointers =
-      malloc((size_t)image_opts.height * sizeof(*row_pointers));
-
-  if (!row_pointers) {
-    fprintf(stderr, "Couldn't allocate memory\n");
+  if (!pixels) {
+    fprintf(stderr, "Couldn't allocate image buffer\n");
     fclose(file);
     png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
     return 1;
   }
 
-  png_size_t rowbytes = png_get_rowbytes(png_ptr, info_ptr);
-
-  for (int y = 0; y < image_opts.height; y++) {
-    row_pointers[y] = malloc(rowbytes);
-
-    if (!row_pointers[y]) {
-      for (int j = 0; j < y; j++) {
-        free(row_pointers[j]);
-      }
-      free(row_pointers);
-      fclose(file);
-      png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-      return 1;
-    }
+  /*
+   * Read each PNG row directly into the correct location.
+   */
+  for (int y = 0; y < height; y++) {
+    png_read_row(png_ptr, pixels + ((size_t)y * rowbytes), NULL);
   }
 
-  png_read_image(png_ptr, row_pointers);
+  /*
+   * Optional but recommended: finish reading the PNG.
+   */
+  png_read_end(png_ptr, NULL);
+
   fclose(file);
   png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 
-  /* Open window */
-  XWindow xwindow =
-      openphoto_create_window(image_opts.width, image_opts.height);
+  fclose(file);
+  png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 
-  char *image_data = malloc((size_t)image_opts.height * image_opts.width * 4);
+  char *image_data =
+      malloc((size_t)image_opts.height * (size_t)image_opts.width * 4);
+  
   if (!image_data) {
+    fprintf(stderr, "Couldn't allocate XImage data\n");
+
+    free(pixels);
     XDestroyWindow(xwindow.dpy, xwindow.w);
+    XFreeGC(xwindow.dpy, xwindow.gc);
     XCloseDisplay(xwindow.dpy);
-    free(row_pointers);
-  }
+    return 1;
+}
 
   XImage *image =
       XCreateImage(xwindow.dpy, xwindow.visual, xwindow.depth, ZPixmap, 0,
@@ -215,14 +228,15 @@ int main(int argc, char *argv[]) {
     free(image_data);
     XDestroyWindow(xwindow.dpy, xwindow.w);
     XCloseDisplay(xwindow.dpy);
-    free(row_pointers);
     return 1;
   }
+
+  unsigned int *dest = (unsigned int *)image->data;
 
   for (int y = 0; y < image_opts.height; y++) {
     for (int x = 0; x < image_opts.width; x++) {
 
-      png_bytep p = &row_pointers[y][x * 4];
+      png_bytep p = pixels + ((size_t)y * rowbytes) + ((size_t)x * 4);
       unsigned long red = p[0];
       unsigned long green = p[1];
       unsigned long blue = p[2];
@@ -241,19 +255,16 @@ int main(int argc, char *argv[]) {
         pixel |= (blue * xwindow.visual->blue_mask) / 255;
       }
 
-      XPutPixel(image, x, y, pixel);
+      dest[y * (image->bytes_per_line / 4) + x] = pixel;
     }
   }
+  free(pixels);
 
   Pixmap pixmap = XCreatePixmap(xwindow.dpy, xwindow.w, image_opts.width,
-                                image_opts.width, xwindow.depth);
+                                image_opts.height, xwindow.depth);
+
   XPutImage(xwindow.dpy, pixmap, xwindow.gc, image, 0, 0, 0, 0,
             image_opts.width, image_opts.height);
-
-  for (int y = 0; y < (int)sizeof rowbytes; y++) {
-    free(row_pointers[y]);
-  }
-  free(row_pointers);
 
   int running = 1;
   while (running) {
@@ -274,7 +285,7 @@ int main(int argc, char *argv[]) {
     case KeyPress: {
       KeySym keysym = XLookupKeysym(&event.xkey, 0);
       if (keysym == XK_q) {
-        return 0;
+	running = 0;
       }
 
       else if (keysym == XK_minus) {
@@ -288,14 +299,15 @@ int main(int argc, char *argv[]) {
         image_opts.zoom += 0.1;
         printf("%f\n", image_opts.zoom);
       }
+      break;
     }
     }
   }
-
   XDestroyImage(image);
+  XFreePixmap(xwindow.dpy, pixmap);
+  XFreeGC(xwindow.dpy, xwindow.gc);
   XDestroyWindow(xwindow.dpy, xwindow.w);
   XCloseDisplay(xwindow.dpy);
-
   return 0;
 }
 

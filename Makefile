@@ -4,7 +4,7 @@ CC = clang
 TARGET = openphoto
 SOURCE = openphoto.c
 
-CFLAGS = -Wall -Wextra -pedantic -O2
+CFLAGS = -Wall -Wextra -pedantic -O2 -march=native -g
 LDFLAGS = -lX11 -lpng
 
 # UNCOMMENT ON OPENBSD
