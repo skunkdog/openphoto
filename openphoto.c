@@ -57,7 +57,7 @@ XWindow openphoto_create_window(int width, int height) {
 int main(int argc, char *argv[]) {
 
   /* Options variables */
-  int GREYSCALE = 0;
+  int GRAYSCALE = 0;
 
   /* Print help*/
   struct File file_opts;
@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
   /* Parce options */
   for (int i = 2; i < argc; i++) {
     if (!strcmp("-g", argv[i])) {
-      GREYSCALE = 1;
+      GRAYSCALE = 1;
     }
   }
 
@@ -228,7 +228,7 @@ int main(int argc, char *argv[]) {
       unsigned long blue = p[2];
       unsigned long pixel = 0;
 
-      if (GREYSCALE) {
+      if (GRAYSCALE) {
         unsigned long gray = (299 * red + 587 * green + 114 * blue) / 1000;
         pixel |= (gray * xwindow.visual->red_mask) / 255;
         pixel |= (gray * xwindow.visual->green_mask) / 255;
