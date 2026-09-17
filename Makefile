@@ -12,5 +12,7 @@ CFLAGS += -I /usr/X11R6/include -I /usr/local/include
 LDFLAGS += -L /usr/X11R6/lib -L /usr/local/lib
 all:
 	$(CC) $(SOURCE) $(CFLAGS) $(LDFLAGS) -o $(TARGET)
-run:
-	make all && ./$(TARGET) openbased.png -g
+test:
+	make all && ./$(TARGET) ~/pictures/openbsd/openbased.png 
+grayscale:
+	make all && ./$(TARGET) ~/pictures/openbsd/openbased.png -g
